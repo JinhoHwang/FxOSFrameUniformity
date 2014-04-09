@@ -1,0 +1,437 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!--  
+    This is a tool draws graphs related with frame uniformity, touch events and layer movement, 
+    Please see the below link page for more details 
+       https://bugzilla.mozilla.org/show_bug.cgi?id=990832
+    
+    How to use this
+      Step1 : apply patches attached on https://bugzilla.mozilla.org/show_bug.cgi?id=990832
+      Step2 : build your gecko and download it to your device
+      Step3 : add a preference to user preference file 
+              ex) echo "pref('layers.scroll-graph',true);"  >> /system/b2g/defaults/pref/user.js 
+      Step4 : do some dragging or scrolling on device and collect scrollgraph log data
+              ex) adb log cat | grep ScrollGraph
+      step5 : open this html file in your browser and put the log data into the textarea
+              and click the "Reload data" button.
+    
+ -->
+<title>Frame Uniformity</title>
+<style>
+p {
+	font-size: 60%;
+}
+</style>
+
+<script type='text/javascript'
+	src='http://code.jquery.com/jquery-1.8.3.js'></script>
+<script type='text/javascript'
+	src="http://www.flotcharts.org/javascript/jquery.flot.min.js"></script>
+<script type='text/javascript'
+	src="http://www.benjaminbuffet.com/public/js/jquery.flot.orderBars.js"></script>
+<script type='text/javascript'
+	src="http://www.codeskulptor.org/js/jquery.flot.axislabels.min.js"></script>
+
+<script type="text/javascript">
+	var valScrollGraphX = new Array();
+	var valScrollGraphY = new Array();
+	var valTouchMoveX = new Array();
+	var valTouchMoveY = new Array();
+	var valTimeStamps = new Array();
+	var valTouch = new Array();
+	var actualLines = 0;
+	var layerID;
+	var timeDelay;
+
+	function initGlobal() {
+		valScrollGraphX.length = 0;
+		valScrollGraphY.length = 0;
+		valTouchMoveX.length = 0;
+		valTouchMoveY.length = 0;
+		valTimeStamps.length = 0;
+		valTouch.length = 0;
+		actualLines = 0;
+		timeDelay = 0;
+		$("#placeholder1_choices").empty();
+		$("#placeholder2_choices").empty();
+	}
+
+	function loadData() {
+		initGlobal();
+		renderData = new Array();
+		currentFrame = 0;
+		minX = undefined;
+		minY = undefined;
+		maxX = undefined;
+		maxY = undefined;
+
+		var charPos = 0;
+		var lastLineLength = 0;
+		var lines = document.getElementById('trace').value.split(/\r|\n/);
+
+		actualLines = 0;
+		var preDataX, preDataY, preTimeStamp;
+		var preTouchX, preTouchY;
+		var touchEvent = 0;
+		var touchmovecnt = 0;
+		var touchDownTime = 0;
+		var isNotFirst = false;
+		
+		for ( var i = 0; i < lines.length; i++) {
+
+			// skip lines without ScrollGraph
+			if (!/ScrollGraph/.test(lines[i])) {
+				continue;
+			}
+			var tokens = lines[i].split(/\s+/);
+			
+			// Parsing Touch Event Data 
+			if (/Touch_Event/.test(lines[i])) {
+				var k = 0;
+				if (/Touch_Event_Down/.test(lines[i])) {
+					while (k < tokens.length
+							&& tokens[k++] != "Touch_Event_Down");
+					touchDownTime = parseInt(tokens[k]);
+					valTouch[touchEvent++] = new Array(0, 20);
+				} else if (/Touch_Event_Move/.test(lines[i])) {
+					while (k < tokens.length
+							&& tokens[k++] != "Touch_Event_Move");
+					if (touchmovecnt != 0) {
+						tmpTouchmovecnt = touchmovecnt - 1;
+						valTouchMoveX[tmpTouchmovecnt] = new Array(
+								tmpTouchmovecnt, Math
+										.abs(parseFloat(tokens[k + 1])
+												- preTouchX));
+						valTouchMoveY[tmpTouchmovecnt] = new Array(
+								tmpTouchmovecnt, Math
+										.abs(parseFloat(tokens[k + 2])
+												- preTouchY));
+					}
+					preTouchX = parseFloat(tokens[k + 1]);
+					preTouchY = parseFloat(tokens[k + 2]);
+					touchmovecnt++;
+
+				} else {
+					while (k < tokens.length && tokens[k++] != "Touch_Event_Up");
+					var positionTouchEnd = parseInt((parseInt(tokens[k]) - touchDownTime) / 16000000);
+					valTouch[touchEvent++] = new Array(positionTouchEnd, 20);
+				}
+				continue;
+			}
+
+			var j = 0;
+			
+			// skip tokens until ScrollGraph found
+			// Parsing Layer Data
+			while (j < tokens.length && tokens[j++] != "ScrollGraph");
+			if (j >= tokens.length - 3) {
+				log("Error parsing line: " + lines[i]);
+				continue;
+			}
+
+			var timestamp = parseInt(tokens[j + 1] / 1000000);			
+			var valueX = parseFloat(tokens[j + 3]);
+			var valueY = parseFloat(tokens[j + 4]);
+
+			if (isNotFirst) {
+				if (!(layerID == tokens[j + 2])) {
+					continue;
+				}
+				valScrollGraphX[actualLines] = new Array(actualLines, Math
+						.abs(preDataX - valueX));
+				valScrollGraphY[actualLines] = new Array(actualLines, Math
+						.abs(preDataY - valueY));
+				valTimeStamps[actualLines] = new Array(actualLines, "("
+						+ (timestamp - preTimeStamp) + ")");
+				actualLines++;
+			} else {
+				layerID = tokens[j + 2];
+				isNotFirst = true;
+				timeDelay = parseInt((parseInt(tokens[j + 1]) - touchDownTime) / 16000000);
+				//alert(timeDelay);
+				for ( var tick = 0; tick < timeDelay; tick++) {
+					valScrollGraphX[actualLines] = new Array(actualLines, 0);
+					valScrollGraphY[actualLines] = new Array(actualLines, 0);
+					valTimeStamps[actualLines] = new Array(actualLines, "("
+							+ 16 + ")");
+					actualLines++;
+				}
+			}
+
+			preDataX = valueX;
+			preDataY = valueY;
+			preTimeStamp = timestamp;
+		}
+
+		drawGraph(false);
+		drawGraph(true);
+		printInformation(valScrollGraphX, "Scroll_X");
+		printInformation(valScrollGraphY, "Scroll_Y");
+
+	} // End of loadData()
+
+	function printInformation(sourceArray, title) {
+		var data = sourceArray;
+		var deviation = new Array();
+		var sumX = 0;
+		var sumY = 0;
+		var devnsum = 0;
+		var stddevn = 0;
+		var len = data.length;
+
+		for ( var i = timeDelay; i < len; i++) {
+			sumX = sumX + (data[i][1]);
+		}
+
+		var mean = (sumX / (len - timeDelay)).toFixed(6); // 6 decimal places
+		// alert("mean :" + mean);
+
+		for (i = timeDelay; i < len; i++) {
+			var tmpCnt = i - timeDelay;
+			deviation[tmpCnt] = data[i][1] - mean;
+			deviation[tmpCnt] = deviation[tmpCnt] * deviation[tmpCnt];
+			devnsum = devnsum + deviation[tmpCnt];
+		}
+
+		var numOfActualData = len - (timeDelay + 1);
+		stddevn = Math.sqrt(devnsum / numOfActualData).toFixed(4); // 4 decimal places
+		result = "<p>" + title + " - The mean is:  " + mean + "<p>" + title
+				+ " - The standard deviation is:  " + stddevn;
+		document.getElementById(title).innerHTML = result;
+
+	}
+
+	function drawGraph(isTouch) {
+
+		var sourceX, sourceY, target, label;
+
+		if (isTouch) {
+			sourceX = valTouchMoveX;
+			sourceY = valTouchMoveY;
+			target = "#placeholder1";
+			label = "TouchMove"
+		} else {
+			sourceX = valScrollGraphX;
+			sourceY = valScrollGraphY;
+			target = "#placeholder2";
+			label = "Layer :" + layerID;
+		}
+
+		var datasets = {
+			"X" : {
+				label : label + " X",
+				data : sourceX,
+				bars : {
+					show : true,
+					barWidth : 0.13,
+					order : 1
+				}
+			},
+			"Y" : {
+				label : label + " Y",
+				data : sourceY,
+				bars : {
+					show : true,
+					barWidth : 0.13,
+					order : 1
+				}
+			},
+			"TouchEvent" : {
+				label : "Touch Event Down/Up",
+				data : valTouch,
+				points : {
+					show : true
+				}
+			}
+		};
+
+		// set color for each series
+		var i = 0;
+		$.each(datasets, function(key, val) {
+			val.color = i;
+			i++;
+		});
+
+		// insert checkboxes 
+		var choiceContainer = $(target + "_choices");
+		$.each(datasets,function(key, val) {
+							if (isTouch && key == "TouchEvent") {
+								return;
+							}
+							choiceContainer
+									.append("<br/><input type='checkbox' name='" + key +
+				"' checked='checked' id='id" + key + "'></input>"
+											+ "<label for='id" + key + "'>"
+											+ val.label + "</label>");
+
+						});
+
+		choiceContainer.find("input").click(plotAccordingToChoices);
+
+		// Display Axis labels
+		var options = {
+			yaxis : {
+				axisLabel : 'Displacement(px)',
+				axisLabelUseCanvas : true,
+				axisLabelFontSizePixels : 12,
+				show : true,
+				tickDecimals : 0,
+				min : 0
+			},
+			xaxis : {
+				axisLabel : 'Appearance',
+				axisLabelUseCanvas : true,
+				axisLabelFontSizePixels : 12,
+				show : true,
+				tickSize : 1,
+				font : {
+					size : 9,
+					style : "normal",
+					color : "black"
+				},
+				tickDecimals : 0,
+				min : 0
+
+			}
+		};
+
+		function plotAccordingToChoices() {
+
+			var data = [];
+
+			choiceContainer.find("input:checked").each(function() {
+				var key = $(this).attr("name");
+				if (key && datasets[key]) {
+					data.push(datasets[key]);
+				}
+			});
+
+			if (data.length > 0) {
+				$.plot(target, data, options);
+			}
+		}
+
+		plotAccordingToChoices();
+
+	}
+</script>
+</head>
+<body>
+	<div>
+		<textarea id="trace" rows="7" style="width: 700px">
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Down 74292864119585
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292905657815 150.000000 487.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292916217865 150.000000 475.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292927388322 150.000000 462.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292938039933 150.000000 450.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292948905186 150.000000 437.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292961052296 150.000000 425.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292971673387 150.000000 412.500000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74292974511781 0xad6cac00 0.000000, -11.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292982813322 150.000000 400.000000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74292991755791 0xad6cac00 0.000000, -24.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292995937082 150.000000 387.500000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293008541996 0xad6cac00 0.000000, -24.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293009060842 150.000000 375.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293019956615 150.000000 362.500000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293024290508 0xad6cac00 0.000000, -49.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293032561529 150.000000 350.000000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293040710468 0xad6cac00 0.000000, -37.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293046173614 150.000000 337.500000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293057527193 0xad6cac00 0.000000, -49.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293059541537 150.000000 325.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293070101586 150.000000 312.500000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293074527040 0xad6cac00 0.000000, -24.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293081027879 150.000000 300.000000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293090824919 0xad6cac00 0.000000, -37.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293093846435 150.000000 287.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293107580603 150.000000 275.000000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293107794245 0xad6cac00 0.000000, -49.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293118384815 150.000000 262.500000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293124519409 0xad6cac00 0.000000, -49.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293129127985 150.000000 250.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293139901678 150.000000 237.500000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293141122493 0xad6cac00 0.000000, -24.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293150980573 150.000000 225.000000
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293157786616 0xad6cac00 0.000000, -49.966187
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293164043292 150.000000 212.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Up  74293166423881
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293174633861 0xad6cac00 0.000000, -42.327209
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293191236943 0xad6cac00 0.000000, -59.817261
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293207717944 0xad6cac00 0.000000, -51.804871
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293224229465 0xad6cac00 0.000000, -68.095337
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293241015672 0xad6cac00 0.000000, -71.978271
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293258473325 0xad6cac00 0.000000, -87.514587
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293277334915 0xad6cac00 0.000000, -102.570679
+I/Gecko   ( 3539): ScrollGraph Layer_Move 74293296501708 0xad6cac00 0.000000, -116.668091
+  </textarea>
+
+		<!-- 
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Down 74292864119585
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292905657815 150.000000 487.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292916217865 150.000000 475.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292927388322 150.000000 462.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292938039933 150.000000 450.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292948905186 150.000000 437.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292961052296 150.000000 425.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292971673387 150.000000 412.500000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -11.966187 74292974511781
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292982813322 150.000000 400.000000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -24.966187 74292991755791
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74292995937082 150.000000 387.500000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -24.966187 74293008541996
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293009060842 150.000000 375.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293019956615 150.000000 362.500000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -49.966187 74293024290508
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293032561529 150.000000 350.000000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -37.966187 74293040710468
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293046173614 150.000000 337.500000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -49.966187 74293057527193
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293059541537 150.000000 325.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293070101586 150.000000 312.500000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -24.966187 74293074527040
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293081027879 150.000000 300.000000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -37.966187 74293090824919
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293093846435 150.000000 287.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293107580603 150.000000 275.000000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -49.966187 74293107794245
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293118384815 150.000000 262.500000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -49.966187 74293124519409
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293129127985 150.000000 250.000000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293139901678 150.000000 237.500000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -24.966187 74293141122493
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293150980573 150.000000 225.000000
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -49.966187 74293157786616
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Move 74293164043292 150.000000 212.500000
+I/Gecko   ( 3539): ScrollGraph Touch_Event_Up  74293166423881
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -42.327209 74293174633861
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -59.817261 74293191236943
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -51.804871 74293207717944
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -68.095337 74293224229465
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -71.978271 74293241015672
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -87.514587 74293258473325
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -102.570679 74293277334915
+I/Gecko   ( 3539): ScrollGraph 0xad6cac00: 0.000000, -116.668091 74293296501708
+-->
+		<button onclick="loadData()">Reload data</button>
+	</div>
+	<div id="Graphs" style="width: 1070px; padding: 10px">
+		<div class="Graph1">
+			<div id="placeholder1"
+				style="float: left; width: 900px; height: 200px;"></div>
+			<p id="placeholder1_choices" style="float: right; width: 150px;"></p>
+		</div>
+		<div class="Graph2">
+			<div id="placeholder2"
+				style="float: left; width: 900px; height: 200px;"></div>
+			<p id="placeholder2_choices" style="float: right; width: 150px;"></p>
+		</div>
+	</div>
+	<div id="numbers" style="width: 1000px">
+		<div id="Scroll_X" style="float: left; width: 450px; height: 80px;"></div>
+		<div id="Scroll_Y" style="float: right; width: 450px; height: 80px;"></div>
+	</div>
+</body>
+</html>
