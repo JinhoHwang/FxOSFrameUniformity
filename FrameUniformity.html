@@ -11,9 +11,9 @@
       Step1 : apply patches attached on https://bugzilla.mozilla.org/show_bug.cgi?id=990832
       Step2 : build your gecko and download it to your device
       Step3 : add a preference to user preference file 
-              ex) echo "pref('layers.scroll-graph',true);"  >> /system/b2g/defaults/pref/user.js 
-      Step4 : do some dragging or scrolling on device and collect scrollgraph log data
-              ex) adb log cat | grep ScrollGraph
+              ex) echo "pref('layers.uniformity-info',true);"  >> /system/b2g/defaults/pref/user.js 
+      Step4 : do some dragging or scrolling on device and collect frame uniformity log data
+              ex) adb log cat | grep UniformityInfo
       step5 : open this html file in your browser and put the log data into the textarea
               and click the "Reload data" button.
     
@@ -81,8 +81,8 @@ p {
 		
 		for ( var i = 0; i < lines.length; i++) {
 
-			// skip lines without ScrollGraph
-			if (!/ScrollGraph/.test(lines[i])) {
+			// skip lines without UniformityInfo
+			if (!/UniformityInfo/.test(lines[i])) {
 				continue;
 			}
 			var tokens = lines[i].split(/\s+/);
@@ -125,7 +125,7 @@ p {
 			
 			// skip tokens until ScrollGraph found
 			// Parsing Layer Data
-			while (j < tokens.length && tokens[j++] != "ScrollGraph");
+			while (j < tokens.length && tokens[j++] != "UniformityInfo");
 			if (j >= tokens.length - 3) {
 				log("Error parsing line: " + lines[i]);
 				continue;
@@ -135,29 +135,60 @@ p {
 			var valueX = parseFloat(tokens[j + 3]);
 			var valueY = parseFloat(tokens[j + 4]);
 
+			
+			function putData(aX,aY,aTime)
+			{
+				putScrollData(aX,aY);
+				putTimeStampData(aTime);
+				actualLines++;
+			}
+			
+			function putScrollData(aX,aY)
+			{
+				valScrollGraphX[actualLines] = new Array(actualLines, aX);
+				valScrollGraphY[actualLines] = new Array(actualLines, aY);				
+			}
+			
+			function putTimeStampData(aNum)
+			{
+				valTimeStamps[actualLines] = new Array(actualLines, "("
+						+ aNum + ")");
+			}
+			
+			function putEmptyData(aNum)
+			{
+				if (aNum < 1) {
+					return;
+				}					
+				for ( var tick = 0; tick < aNum; tick++) {
+					putData(0,0,16);
+				}			    
+			}
+			
 			if (isNotFirst) {
 				if (!(layerID == tokens[j + 2])) {
 					continue;
 				}
+				var empytNum = (timestamp - preTimeStamp) / 16;
+ 				putEmptyData(empytNum-1);
+ 				
+ 				putData(Math.abs(preDataX - valueX),
+ 						Math.abs(preDataY - valueY),
+ 						timestamp - preTimeStamp)
+/*  				
 				valScrollGraphX[actualLines] = new Array(actualLines, Math
 						.abs(preDataX - valueX));
 				valScrollGraphY[actualLines] = new Array(actualLines, Math
 						.abs(preDataY - valueY));
 				valTimeStamps[actualLines] = new Array(actualLines, "("
-						+ (timestamp - preTimeStamp) + ")");
-				actualLines++;
+						+ (timestamp - preTimeStamp) + ")"); */
+//				actualLines++;
 			} else {
 				layerID = tokens[j + 2];
 				isNotFirst = true;
-				timeDelay = parseInt((parseInt(tokens[j + 1]) - touchDownTime) / 16000000);
+				timeDelay = (timestamp - (touchDownTime/1000000)) / 16;
 				//alert(timeDelay);
-				for ( var tick = 0; tick < timeDelay; tick++) {
-					valScrollGraphX[actualLines] = new Array(actualLines, 0);
-					valScrollGraphY[actualLines] = new Array(actualLines, 0);
-					valTimeStamps[actualLines] = new Array(actualLines, "("
-							+ 16 + ")");
-					actualLines++;
-				}
+				putEmptyData(timeDelay-1);
 			}
 
 			preDataX = valueX;
@@ -165,11 +196,15 @@ p {
 			preTimeStamp = timestamp;
 		}
 
-		drawGraph(false);
-		drawGraph(true);
-		printInformation(valScrollGraphX, "Scroll_X");
-		printInformation(valScrollGraphY, "Scroll_Y");
-
+		if (valTouchMoveX.length!=0 && valTouchMoveY.length!=0)
+			drawGraph(false);
+		if (valScrollGraphX.length!=0 && valScrollGraphX.length!=0) {
+			drawGraph(true);
+			printInformation(valScrollGraphX, "Scroll_X");
+			printInformation(valScrollGraphY, "Scroll_Y");
+		}
+			
+		
 	} // End of loadData()
 
 	function printInformation(sourceArray, title) {
@@ -321,204 +356,94 @@ p {
 <body>
 	<div>
 		<textarea id="trace" rows="7" style="width: 700px">
-I/Gonk    (  177): ScrollGraph Touch_Event_Down 1968275889744 734.500000 665.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968295758506 729.500000 666.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968308577062 728.500000 666.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968316329236 727.000000 666.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968326614602 724.500000 667.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968334519378 0xb1057400 -14.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968334671980 0xb1058400 753.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968337327252 721.000000 667.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968347368455 717.000000 668.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968351122460 0xb1057400 -18.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968351275062 0xb1058400 749.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968357806422 711.500000 669.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968367664502 0xb1057400 -24.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968367786584 0xb1058400 743.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968370075612 704.000000 670.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968378468715 696.000000 671.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968383962382 0xb1057400 -40.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968384084463 0xb1058400 727.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968388815121 687.000000 672.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968399466731 677.500000 673.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968400504423 0xb1057400 -56.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968400626505 0xb1058400 711.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968409538453 666.500000 674.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968416802302 0xb1057400 -68.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968416924383 0xb1058400 699.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968420098502 655.000000 674.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968430322827 643.500000 675.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968433832669 0xb1057400 -68.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968433985271 0xb1058400 699.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968440608192 633.000000 675.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968450069508 0xb1057400 -102.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968450222110 0xb1058400 665.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968451168242 622.500000 675.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968461301005 612.500000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968466397907 0xb1057400 -122.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968466550509 0xb1058400 645.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968471677932 602.000000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968483123071 0xb1057400 -146.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968483367234 0xb1058400 621.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968484862732 591.500000 675.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968492309703 582.000000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968498505339 0xb1057400 -152.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968498627420 0xb1058400 615.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968502900272 573.500000 675.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968513094076 565.500000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968514742176 0xb1057400 -152.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968514864258 0xb1058400 615.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968523440482 557.500000 676.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968530856933 0xb1057400 -178.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968531009535 0xb1058400 589.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968533817409 549.500000 676.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968544133296 542.000000 676.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968546941170 0xb1057400 -178.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968547093772 0xb1058400 589.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968554784906 534.000000 676.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968563361131 0xb1057400 -194.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968563483212 0xb1058400 573.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968564917670 526.000000 676.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968575111474 518.000000 676.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968579720050 0xb1057400 -210.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968579842132 0xb1058400 557.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968585457880 510.000000 677.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968595895847 500.500000 677.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968596017929 0xb1057400 -218.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968596140010 0xb1058400 549.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968606425376 491.000000 677.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968611980084 0xb1057400 -234.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968612163206 0xb1058400 533.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968616558139 480.500000 678.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968626874025 470.500000 678.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968628247442 0xb1057400 -242.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968628369523 0xb1058400 525.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968637281472 461.500000 679.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968644881044 0xb1057400 -264.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968645003126 0xb1058400 503.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968647780480 451.500000 679.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968658126886 439.500000 679.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968660965280 0xb1057400 -284.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968661087362 0xb1058400 483.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968668290170 427.000000 679.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968677354721 0xb1057400 -294.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968677598884 0xb1058400 473.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968678758658 414.500000 679.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968688982983 402.500000 679.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968693591559 0xb1057400 -318.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968693744161 0xb1058400 449.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968699390430 389.500000 678.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968710103080 376.500000 678.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968710866090 0xb1057400 -344.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968711018691 0xb1058400 423.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968720174803 363.500000 678.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968726248357 0xb1057400 -358.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968726462000 0xb1058400 409.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968730490689 351.000000 678.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968740837095 339.000000 677.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968742576756 0xb1057400 -386.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968742820919 0xb1058400 381.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968751366623 327.500000 677.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968758813594 0xb1057400 -394.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968759057757 0xb1058400 373.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968761499388 316.000000 677.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968771815273 305.000000 677.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968775325116 0xb1057400 -418.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968775569279 0xb1058400 349.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968782161680 295.000000 677.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968791653515 0xb1057400 -440.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968792019760 0xb1058400 327.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968792508086 286.000000 676.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968803281777 277.000000 676.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968808256598 0xb1057400 -450.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968808378679 0xb1058400 317.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968813292459 268.000000 676.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968823638865 259.000000 676.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968824829159 0xb1057400 -466.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968825073322 0xb1058400 301.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968833985271 250.500000 676.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968841249120 0xb1057400 -478.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968841401721 0xb1058400 289.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968844270636 242.500000 676.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968854739125 235.500000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968857821683 0xb1057400 -492.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968858187927 0xb1058400 275.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968865238134 228.500000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968874119562 0xb1057400 -508.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968874363725 0xb1058400 259.997986, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968875370897 223.000000 675.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968885717304 217.000000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968890844726 0xb1057400 -512.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968891088889 0xb1058400 255.998001, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968896155271 210.000000 675.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968906867921 202.500000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968907691971 0xb1057400 -524.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968907936134 0xb1058400 243.998001, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968916848083 194.500000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968923776207 0xb1057400 -534.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968923928809 0xb1058400 233.998001, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968927133448 186.500000 675.500000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968937479854 179.000000 675.500000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968939860443 0xb1057400 -548.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968940043566 0xb1058400 219.998001, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968947948342 170.500000 676.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968956829770 0xb1057400 -564.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968957134974 0xb1058400 203.998001, 0.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Move 1968958477870 165.500000 676.000000
-I/Gonk    (  177): ScrollGraph Touch_Event_Up 1968967878145 165.500000 676.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968973402332 0xb1057400 -572.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968973646495 0xb1058400 195.998001, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968990035936 0xb1057400 -579.813721, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1968990158017 0xb1058400 188.184296, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969006608498 0xb1057400 -594.136292, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969006822140 0xb1058400 173.861679, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969023120019 0xb1057400 -614.852417, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969023669386 0xb1058400 153.145569, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969039326337 0xb1057400 -638.988464, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969039570500 0xb1058400 129.009506, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969057058673 0xb1057400 -662.712402, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969057485958 0xb1058400 105.285522, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969073570195 0xb1057400 -683.957764, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969073997480 0xb1058400 84.040283, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969090295359 0xb1057400 -701.853027, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969090753164 0xb1058400 66.144928, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969107508848 0xb1057400 -716.639648, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969108271858 0xb1058400 51.358307, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969124142451 0xb1057400 -728.756592, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969124905461 0xb1058400 39.241455, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969140776054 0xb1057400 -738.627930, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969141539063 0xb1058400 29.370056, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969156951851 0xb1057400 -746.624390, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969157653820 0xb1058400 21.373596, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969173554935 0xb1057400 -752.995361, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969174226384 0xb1058400 15.002594, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969190280099 0xb1057400 -758.003418, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969190707384 0xb1058400 9.994537, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969207066304 0xb1057400 -761.839478, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969207829313 0xb1058400 6.158539, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969223638866 0xb1057400 -764.656494, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969224066151 0xb1058400 3.341461, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969248207765 0xb1057400 -767.059692, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969248909734 0xb1058400 0.938263, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969268809016 0xb1057400 -767.874390, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969269205781 0xb1058400 0.123627, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969289013503 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969289562869 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969305799708 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969308149777 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969320144283 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969320266364 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969336350600 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969336472682 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969352556918 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969352709520 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969368946358 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969369068439 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969385976726 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969386342971 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969401084310 0xb1057400 -767.998047, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969401420034 0xb1058400 0.000000, 0.000000
-I/Gecko   (  177): ScrollGraph Layer_Move 1969417504270 0xb1057400 -767.998047, 0.000000
+05-07 22:01:42.886: I/Gonk(3785): UniformityInfo Touch_Event_Down 5688851987485 580.000000 789.500000
+05-07 22:01:42.886: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688855588889 563.000000 787.500000
+05-07 22:01:42.896: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688866148937 557.000000 787.000000
+05-07 22:01:42.896: I/Gecko(3785): UniformityInfo Layer_Move 5688867766517 0xab8f5c00 -767.997986, 0.000000
+05-07 22:01:42.896: I/Gecko(3785): UniformityInfo Layer_Move 5688868102241 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:42.896: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688869475658 529.500000 784.000000
+05-07 22:01:42.906: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688877075230 488.500000 779.000000
+05-07 22:01:42.916: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688887085912 444.000000 773.000000
+05-07 22:01:42.926: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688897310237 398.500000 765.000000
+05-07 22:01:42.936: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688907748204 351.000000 756.000000
+05-07 22:01:42.946: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688917667325 302.500000 745.500000
+05-07 22:01:42.956: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688927983211 250.500000 733.500000
+05-07 22:01:42.966: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688938146496 196.500000 721.500000
+05-07 22:01:42.976: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688948279259 190.000000 720.000000
+05-07 22:01:42.986: I/Gecko(3785): UniformityInfo Layer_Move 5688956519760 0xab8f5c00 -691.997986, 0.000000
+05-07 22:01:42.986: I/Gecko(3785): UniformityInfo Layer_Move 5688956672362 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:42.986: I/Gonk(3785): UniformityInfo Touch_Event_Up 5688959846480 190.000000 720.000000
+05-07 22:01:43.016: I/Gecko(3785): UniformityInfo Layer_Move 5688981668546 0xab8f5c00 -311.997986, 0.000000
+05-07 22:01:43.016: I/Gecko(3785): UniformityInfo Layer_Move 5688982095831 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.036: I/Gecko(3785): UniformityInfo Layer_Move 5689000652218 0xab8f5c00 -271.734436, 0.000000
+05-07 22:01:43.036: I/Gecko(3785): UniformityInfo Layer_Move 5689001018462 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.046: I/Gecko(3785): UniformityInfo Layer_Move 5689016828015 0xab8f5c00 -196.359070, 0.000000
+05-07 22:01:43.046: I/Gecko(3785): UniformityInfo Layer_Move 5689017163739 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.067: I/Gecko(3785): UniformityInfo Layer_Move 5689034438270 0xab8f5c00 -125.480255, 0.000000
+05-07 22:01:43.067: I/Gecko(3785): UniformityInfo Layer_Move 5689034743474 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.087: I/Gecko(3785): UniformityInfo Layer_Move 5689051193954 0xab8f5c00 -75.088379, 0.000000
+05-07 22:01:43.087: I/Gecko(3785): UniformityInfo Layer_Move 5689052140086 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.097: I/Gecko(3785): UniformityInfo Layer_Move 5689068682128 0xab8f5c00 -41.579987, 0.000000
+05-07 22:01:43.097: I/Gecko(3785): UniformityInfo Layer_Move 5689069262015 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.117: I/Gecko(3785): UniformityInfo Layer_Move 5689085590414 0xab8f5c00 -20.033142, 0.000000
+05-07 22:01:43.117: I/Gecko(3785): UniformityInfo Layer_Move 5689086475504 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.137: I/Gecko(3785): UniformityInfo Layer_Move 5689101888292 0xab8f5c00 -7.299133, 0.000000
+05-07 22:01:43.137: I/Gecko(3785): UniformityInfo Layer_Move 5689102285057 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.157: I/Gecko(3785): UniformityInfo Layer_Move 5689126579275 0xab8f5c00 -1.156616, 0.000000
+05-07 22:01:43.157: I/Gecko(3785): UniformityInfo Layer_Move 5689127037081 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.187: I/Gecko(3785): UniformityInfo Layer_Move 5689150873491 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.197: I/Gecko(3785): UniformityInfo Layer_Move 5689167629175 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.217: I/Gecko(3785): UniformityInfo Layer_Move 5689183804973 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.247: I/Gecko(3785): UniformityInfo Layer_Move 5689202727603 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.267: I/Gecko(3785): UniformityInfo Layer_Move 5689231813518 0xab8f8c00 -767.923218, 0.000000
+05-07 22:01:43.277: I/Gecko(3785): UniformityInfo Layer_Move 5689248263999 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.297: I/Gecko(3785): UniformityInfo Layer_Move 5689265019683 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.317: I/Gecko(3785): UniformityInfo Layer_Move 5689281683806 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.327: I/Gecko(3785): UniformityInfo Layer_Move 5689298286889 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.347: I/Gecko(3785): UniformityInfo Layer_Move 5689315897143 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.367: I/Gecko(3785): UniformityInfo Layer_Move 5689331706697 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.377: I/Gecko(3785): UniformityInfo Layer_Move 5689349316952 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.397: I/Gecko(3785): UniformityInfo Layer_Move 5689365095984 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.437: I/Gecko(3785): UniformityInfo Layer_Move 5689409075840 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.517: I/Gecko(3785): UniformityInfo Layer_Move 5689481378603 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.587: I/Gecko(3785): UniformityInfo Layer_Move 5689559815960 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.657: I/Gecko(3785): UniformityInfo Layer_Move 5689622077519 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.667: I/Gecko(3785): UniformityInfo Layer_Move 5689638497479 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.717: I/Gecko(3785): UniformityInfo Layer_Move 5689687940482 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.797: I/Gecko(3785): UniformityInfo Layer_Move 5689761403020 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.817: I/Gecko(3785): UniformityInfo Layer_Move 5689782431556 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.857: I/Gecko(3785): UniformityInfo Layer_Move 5689822413243 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.947: I/Gecko(3785): UniformityInfo Layer_Move 5689910983364 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:43.987: I/Gecko(3785): UniformityInfo Layer_Move 5689956641841 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.138: I/Gecko(3785): UniformityInfo Layer_Move 5690102101936 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.208: I/Gecko(3785): UniformityInfo Layer_Move 5690173977412 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.268: I/Gecko(3785): UniformityInfo Layer_Move 5690238772163 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.358: I/Gecko(3785): UniformityInfo Layer_Move 5690326640314 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.428: I/Gecko(3785): UniformityInfo Layer_Move 5690391465585 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.488: I/Gecko(3785): UniformityInfo Layer_Move 5690456748662 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.558: I/Gecko(3785): UniformityInfo Layer_Move 5690522062259 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.748: I/Gecko(3785): UniformityInfo Layer_Move 5690711990536 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.928: I/Gecko(3785): UniformityInfo Layer_Move 5690899294062 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:44.984: I/Gecko(3785): UniformityInfo Layer_Move 5690945453282 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:45.144: I/Gecko(3785): UniformityInfo Layer_Move 5691102818948 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:45.374: I/Gecko(3785): UniformityInfo Layer_Move 5691331254233 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:45.504: I/Gecko(3785): UniformityInfo Layer_Move 5691466408787 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:45.554: I/Gecko(3785): UniformityInfo Layer_Move 5691512101398 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:45.734: I/Gecko(3785): UniformityInfo Layer_Move 5691697085785 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:45.954: I/Gecko(3785): UniformityInfo Layer_Move 5691918584891 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:46.044: I/Gecko(3785): UniformityInfo Layer_Move 5692004872525 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:59.238: I/Gecko(3785): UniformityInfo Layer_Move 5705206754774 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:59.539: I/Gecko(3785): UniformityInfo Layer_Move 5705503534875 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:59.559: I/Gecko(3785): UniformityInfo Layer_Move 5705528408978 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:59.749: I/Gecko(3785): UniformityInfo Layer_Move 5705711378612 0xab8f8c00 -767.997986, 0.000000
+05-07 22:01:59.969: I/Gecko(3785): UniformityInfo Layer_Move 5705931094773 0xab8f8c00 -767.997986, 0.000000
+05-07 22:02:00.019: I/Gecko(3785): UniformityInfo Layer_Move 5705983284609 0xab8f8c00 -767.997986, 0.000000
+05-07 22:02:01.020: I/Gecko(3785): UniformityInfo Layer_Move 5706985085310 0xab8f8c00 -767.997986, 0.000000
+05-07 22:02:04.254: I/Gecko(3785): UniformityInfo Layer_Move 5710213225093 0xab8f8c00 -767.997986, 0.000000
+05-07 22:02:09.249: I/Gecko(3785): UniformityInfo Layer_Move 5715210417217 0xab8f8c00 -767.997986, 0.000000
+05-07 22:03:01.044: I/Gecko(3785): UniformityInfo Layer_Move 5767001535783 0xab8f8c00 -767.997986, 0.000000
+05-07 22:03:09.273: I/Gecko(3785): UniformityInfo Layer_Move 5775239258962 0xab8f8c00 -767.997986, 0.000000
+05-07 22:03:14.258: I/Gecko(3785): UniformityInfo Layer_Move 5780229461922 0xab8f8c00 -767.997986, 0.000000
                 </textarea>
 		<button onclick="loadData()">Reload data</button>
 	</div>
