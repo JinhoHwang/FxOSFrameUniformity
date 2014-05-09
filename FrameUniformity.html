@@ -134,61 +134,26 @@ p {
 			var timestamp = parseInt(tokens[j + 1] / 1000000);			
 			var valueX = parseFloat(tokens[j + 3]);
 			var valueY = parseFloat(tokens[j + 4]);
-
-			
-			function putData(aX,aY,aTime)
-			{
-				putScrollData(aX,aY);
-				putTimeStampData(aTime);
-				actualLines++;
-			}
-			
-			function putScrollData(aX,aY)
-			{
-				valScrollGraphX[actualLines] = new Array(actualLines, aX);
-				valScrollGraphY[actualLines] = new Array(actualLines, aY);				
-			}
-			
-			function putTimeStampData(aNum)
-			{
-				valTimeStamps[actualLines] = new Array(actualLines, "("
-						+ aNum + ")");
-			}
-			
-			function putEmptyData(aNum)
-			{
-				if (aNum < 1) {
-					return;
-				}					
-				for ( var tick = 0; tick < aNum; tick++) {
-					putData(0,0,16);
-				}			    
-			}
 			
 			if (isNotFirst) {
 				if (!(layerID == tokens[j + 2])) {
 					continue;
 				}
-				var empytNum = (timestamp - preTimeStamp) / 16;
- 				putEmptyData(empytNum-1);
+				var emptyNum = (timestamp - preTimeStamp) / 16;
+				
+ 				putEmptyData(emptyNum-1);
  				
  				putData(Math.abs(preDataX - valueX),
  						Math.abs(preDataY - valueY),
  						timestamp - preTimeStamp)
-/*  				
-				valScrollGraphX[actualLines] = new Array(actualLines, Math
-						.abs(preDataX - valueX));
-				valScrollGraphY[actualLines] = new Array(actualLines, Math
-						.abs(preDataY - valueY));
-				valTimeStamps[actualLines] = new Array(actualLines, "("
-						+ (timestamp - preTimeStamp) + ")"); */
-//				actualLines++;
 			} else {
 				layerID = tokens[j + 2];
 				isNotFirst = true;
 				timeDelay = (timestamp - (touchDownTime/1000000)) / 16;
-				//alert(timeDelay);
-				putEmptyData(timeDelay-1);
+				if (timeDelay < 1) {
+					timeDelay = 1;
+				}
+				putEmptyData(timeDelay);
 			}
 
 			preDataX = valueX;
@@ -196,15 +161,45 @@ p {
 			preTimeStamp = timestamp;
 		}
 
-		if (valTouchMoveX.length!=0 && valTouchMoveY.length!=0)
+		if (valTouchMoveX.length!=0 && valTouchMoveY.length!=0) {
 			drawGraph(false);
+		}
+		
 		if (valScrollGraphX.length!=0 && valScrollGraphX.length!=0) {
 			drawGraph(true);
 			printInformation(valScrollGraphX, "Scroll_X");
 			printInformation(valScrollGraphY, "Scroll_Y");
 		}
-			
+
+		function putEmptyData(aNum)
+		{
+			if (aNum < 1) {				
+				return;
+			}				
+			for ( var tick = 0; tick < aNum; tick++) {
+				putData(0,0,16);
+			}			    
+		}
+
+		function putData(aX,aY,aTime)
+		{
+			putScrollData(aX,aY);
+			putTimeStampData(aTime);
+			actualLines++;
+		}
 		
+		function putScrollData(aX,aY)
+		{
+			valScrollGraphX[actualLines] = new Array(actualLines, aX);
+			valScrollGraphY[actualLines] = new Array(actualLines, aY);				
+		}
+		
+		function putTimeStampData(aNum)
+		{
+			valTimeStamps[actualLines] = new Array(actualLines, "("
+					+ aNum + ")");
+		}
+	
 	} // End of loadData()
 
 	function printInformation(sourceArray, title) {
@@ -216,21 +211,20 @@ p {
 		var stddevn = 0;
 		var len = data.length;
 
-		for ( var i = timeDelay; i < len; i++) {
+		for ( var i = 0; i < len; i++) {
 			sumX = sumX + (data[i][1]);
 		}
 
-		var mean = (sumX / (len - timeDelay)).toFixed(6); // 6 decimal places
+		var mean = (sumX / (len)).toFixed(6); // 6 decimal places
 		// alert("mean :" + mean);
 
-		for (i = timeDelay; i < len; i++) {
-			var tmpCnt = i - timeDelay;
-			deviation[tmpCnt] = data[i][1] - mean;
-			deviation[tmpCnt] = deviation[tmpCnt] * deviation[tmpCnt];
-			devnsum = devnsum + deviation[tmpCnt];
+		for (i = 0; i < len; i++) {			
+			deviation[i] = data[i][1] - mean;
+			deviation[i] = deviation[i] * deviation[i];
+			devnsum = devnsum + deviation[i];
 		}
 
-		var numOfActualData = len - (timeDelay + 1);
+		var numOfActualData = len - 1;
 		stddevn = Math.sqrt(devnsum / numOfActualData).toFixed(4); // 4 decimal places
 		result = "<p>" + title + " - The mean is:  " + mean + "<p>" + title
 				+ " - The standard deviation is:  " + stddevn;
@@ -356,94 +350,121 @@ p {
 <body>
 	<div>
 		<textarea id="trace" rows="7" style="width: 700px">
-05-07 22:01:42.886: I/Gonk(3785): UniformityInfo Touch_Event_Down 5688851987485 580.000000 789.500000
-05-07 22:01:42.886: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688855588889 563.000000 787.500000
-05-07 22:01:42.896: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688866148937 557.000000 787.000000
-05-07 22:01:42.896: I/Gecko(3785): UniformityInfo Layer_Move 5688867766517 0xab8f5c00 -767.997986, 0.000000
-05-07 22:01:42.896: I/Gecko(3785): UniformityInfo Layer_Move 5688868102241 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:42.896: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688869475658 529.500000 784.000000
-05-07 22:01:42.906: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688877075230 488.500000 779.000000
-05-07 22:01:42.916: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688887085912 444.000000 773.000000
-05-07 22:01:42.926: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688897310237 398.500000 765.000000
-05-07 22:01:42.936: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688907748204 351.000000 756.000000
-05-07 22:01:42.946: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688917667325 302.500000 745.500000
-05-07 22:01:42.956: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688927983211 250.500000 733.500000
-05-07 22:01:42.966: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688938146496 196.500000 721.500000
-05-07 22:01:42.976: I/Gonk(3785): UniformityInfo Touch_Event_Move 5688948279259 190.000000 720.000000
-05-07 22:01:42.986: I/Gecko(3785): UniformityInfo Layer_Move 5688956519760 0xab8f5c00 -691.997986, 0.000000
-05-07 22:01:42.986: I/Gecko(3785): UniformityInfo Layer_Move 5688956672362 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:42.986: I/Gonk(3785): UniformityInfo Touch_Event_Up 5688959846480 190.000000 720.000000
-05-07 22:01:43.016: I/Gecko(3785): UniformityInfo Layer_Move 5688981668546 0xab8f5c00 -311.997986, 0.000000
-05-07 22:01:43.016: I/Gecko(3785): UniformityInfo Layer_Move 5688982095831 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.036: I/Gecko(3785): UniformityInfo Layer_Move 5689000652218 0xab8f5c00 -271.734436, 0.000000
-05-07 22:01:43.036: I/Gecko(3785): UniformityInfo Layer_Move 5689001018462 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.046: I/Gecko(3785): UniformityInfo Layer_Move 5689016828015 0xab8f5c00 -196.359070, 0.000000
-05-07 22:01:43.046: I/Gecko(3785): UniformityInfo Layer_Move 5689017163739 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.067: I/Gecko(3785): UniformityInfo Layer_Move 5689034438270 0xab8f5c00 -125.480255, 0.000000
-05-07 22:01:43.067: I/Gecko(3785): UniformityInfo Layer_Move 5689034743474 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.087: I/Gecko(3785): UniformityInfo Layer_Move 5689051193954 0xab8f5c00 -75.088379, 0.000000
-05-07 22:01:43.087: I/Gecko(3785): UniformityInfo Layer_Move 5689052140086 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.097: I/Gecko(3785): UniformityInfo Layer_Move 5689068682128 0xab8f5c00 -41.579987, 0.000000
-05-07 22:01:43.097: I/Gecko(3785): UniformityInfo Layer_Move 5689069262015 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.117: I/Gecko(3785): UniformityInfo Layer_Move 5689085590414 0xab8f5c00 -20.033142, 0.000000
-05-07 22:01:43.117: I/Gecko(3785): UniformityInfo Layer_Move 5689086475504 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.137: I/Gecko(3785): UniformityInfo Layer_Move 5689101888292 0xab8f5c00 -7.299133, 0.000000
-05-07 22:01:43.137: I/Gecko(3785): UniformityInfo Layer_Move 5689102285057 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.157: I/Gecko(3785): UniformityInfo Layer_Move 5689126579275 0xab8f5c00 -1.156616, 0.000000
-05-07 22:01:43.157: I/Gecko(3785): UniformityInfo Layer_Move 5689127037081 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.187: I/Gecko(3785): UniformityInfo Layer_Move 5689150873491 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.197: I/Gecko(3785): UniformityInfo Layer_Move 5689167629175 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.217: I/Gecko(3785): UniformityInfo Layer_Move 5689183804973 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.247: I/Gecko(3785): UniformityInfo Layer_Move 5689202727603 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.267: I/Gecko(3785): UniformityInfo Layer_Move 5689231813518 0xab8f8c00 -767.923218, 0.000000
-05-07 22:01:43.277: I/Gecko(3785): UniformityInfo Layer_Move 5689248263999 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.297: I/Gecko(3785): UniformityInfo Layer_Move 5689265019683 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.317: I/Gecko(3785): UniformityInfo Layer_Move 5689281683806 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.327: I/Gecko(3785): UniformityInfo Layer_Move 5689298286889 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.347: I/Gecko(3785): UniformityInfo Layer_Move 5689315897143 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.367: I/Gecko(3785): UniformityInfo Layer_Move 5689331706697 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.377: I/Gecko(3785): UniformityInfo Layer_Move 5689349316952 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.397: I/Gecko(3785): UniformityInfo Layer_Move 5689365095984 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.437: I/Gecko(3785): UniformityInfo Layer_Move 5689409075840 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.517: I/Gecko(3785): UniformityInfo Layer_Move 5689481378603 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.587: I/Gecko(3785): UniformityInfo Layer_Move 5689559815960 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.657: I/Gecko(3785): UniformityInfo Layer_Move 5689622077519 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.667: I/Gecko(3785): UniformityInfo Layer_Move 5689638497479 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.717: I/Gecko(3785): UniformityInfo Layer_Move 5689687940482 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.797: I/Gecko(3785): UniformityInfo Layer_Move 5689761403020 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.817: I/Gecko(3785): UniformityInfo Layer_Move 5689782431556 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.857: I/Gecko(3785): UniformityInfo Layer_Move 5689822413243 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.947: I/Gecko(3785): UniformityInfo Layer_Move 5689910983364 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:43.987: I/Gecko(3785): UniformityInfo Layer_Move 5689956641841 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.138: I/Gecko(3785): UniformityInfo Layer_Move 5690102101936 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.208: I/Gecko(3785): UniformityInfo Layer_Move 5690173977412 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.268: I/Gecko(3785): UniformityInfo Layer_Move 5690238772163 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.358: I/Gecko(3785): UniformityInfo Layer_Move 5690326640314 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.428: I/Gecko(3785): UniformityInfo Layer_Move 5690391465585 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.488: I/Gecko(3785): UniformityInfo Layer_Move 5690456748662 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.558: I/Gecko(3785): UniformityInfo Layer_Move 5690522062259 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.748: I/Gecko(3785): UniformityInfo Layer_Move 5690711990536 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.928: I/Gecko(3785): UniformityInfo Layer_Move 5690899294062 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:44.984: I/Gecko(3785): UniformityInfo Layer_Move 5690945453282 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:45.144: I/Gecko(3785): UniformityInfo Layer_Move 5691102818948 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:45.374: I/Gecko(3785): UniformityInfo Layer_Move 5691331254233 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:45.504: I/Gecko(3785): UniformityInfo Layer_Move 5691466408787 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:45.554: I/Gecko(3785): UniformityInfo Layer_Move 5691512101398 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:45.734: I/Gecko(3785): UniformityInfo Layer_Move 5691697085785 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:45.954: I/Gecko(3785): UniformityInfo Layer_Move 5691918584891 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:46.044: I/Gecko(3785): UniformityInfo Layer_Move 5692004872525 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:59.238: I/Gecko(3785): UniformityInfo Layer_Move 5705206754774 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:59.539: I/Gecko(3785): UniformityInfo Layer_Move 5705503534875 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:59.559: I/Gecko(3785): UniformityInfo Layer_Move 5705528408978 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:59.749: I/Gecko(3785): UniformityInfo Layer_Move 5705711378612 0xab8f8c00 -767.997986, 0.000000
-05-07 22:01:59.969: I/Gecko(3785): UniformityInfo Layer_Move 5705931094773 0xab8f8c00 -767.997986, 0.000000
-05-07 22:02:00.019: I/Gecko(3785): UniformityInfo Layer_Move 5705983284609 0xab8f8c00 -767.997986, 0.000000
-05-07 22:02:01.020: I/Gecko(3785): UniformityInfo Layer_Move 5706985085310 0xab8f8c00 -767.997986, 0.000000
-05-07 22:02:04.254: I/Gecko(3785): UniformityInfo Layer_Move 5710213225093 0xab8f8c00 -767.997986, 0.000000
-05-07 22:02:09.249: I/Gecko(3785): UniformityInfo Layer_Move 5715210417217 0xab8f8c00 -767.997986, 0.000000
-05-07 22:03:01.044: I/Gecko(3785): UniformityInfo Layer_Move 5767001535783 0xab8f8c00 -767.997986, 0.000000
-05-07 22:03:09.273: I/Gecko(3785): UniformityInfo Layer_Move 5775239258962 0xab8f8c00 -767.997986, 0.000000
-05-07 22:03:14.258: I/Gecko(3785): UniformityInfo Layer_Move 5780229461922 0xab8f8c00 -767.997986, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Down 3840174597156 162.500000 643.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840193153542 0xae82d800 767.998047, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840197365353 177.000000 642.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840209787145 193.500000 643.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840220408234 202.500000 644.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840229228621 213.500000 646.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840236767153 225.500000 647.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840247449284 0xae82d800 725.998047, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840247571365 0xae82fc00 -42.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840249433108 237.500000 648.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840257185282 250.000000 649.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840263136755 0xae82d800 677.998047, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840263258836 0xae82fc00 -90.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840267562209 264.000000 650.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840277939135 280.000000 650.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840279800878 0xae82d800 653.998047, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840279953480 0xae82fc00 -114.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840287980338 296.000000 650.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840296465001 0xae82d800 625.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840296770205 0xae82fc00 -142.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840298143621 312.500000 650.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840308245864 330.000000 649.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840312946003 0xae82d800 609.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840313098605 0xae82fc00 -158.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840318561751 347.500000 647.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840328786076 364.000000 646.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840329793248 0xae82d800 577.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840329945850 0xae82fc00 -190.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840338979880 381.500000 644.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840345206036 0xae82d800 541.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840345602801 0xae82fc00 -226.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840349173684 400.000000 642.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840359306448 418.000000 640.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840361259752 0xae82d800 521.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840361381833 0xae82fc00 -246.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840369652854 437.000000 638.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840377008263 0xae82d800 487.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840377130345 0xae82fc00 -280.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840379755097 455.500000 637.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840389918381 473.000000 635.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840393061980 0xae82d800 461.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840393184062 0xae82fc00 -306.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840400203748 490.500000 634.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840409085176 0xae82d800 429.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840409237778 0xae82fc00 -338.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840410489115 507.500000 633.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840420652398 524.000000 633.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840425688260 0xae82d800 399.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840425810341 0xae82fc00 -368.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840431120886 540.000000 632.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840441009486 556.000000 632.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840442291342 0xae82d800 381.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840442443944 0xae82fc00 -386.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840451996820 572.500000 632.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840458680782 0xae82d800 349.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840458802863 0xae82fc00 -418.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840461397095 588.500000 632.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840471712981 604.000000 633.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840474612416 0xae82d800 315.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840474734497 0xae82fc00 -452.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840482761355 620.000000 633.500000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840490605091 0xae82d800 305.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840490757693 0xae82fc00 -462.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840492009028 635.500000 634.500000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840502508036 650.000000 636.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840507452336 0xae82d800 267.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840507604938 0xae82fc00 -500.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840512549238 663.500000 638.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Move 3840522590441 669.500000 639.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840523933337 0xae82d800 261.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840524085939 0xae82fc00 -506.000000, 0.000000
+I/Gonk    (  179): UniformityInfo Touch_Event_Up 3840533272571 669.500000 639.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840544717710 0xae82d800 245.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840544839792 0xae82fc00 -522.000000, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840568065795 0xae82d800 232.850586, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840568279437 0xae82fc00 -535.147461, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840584272112 0xae82d800 212.809448, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840584485755 0xae82fc00 -555.188538, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840604140875 0xae82d800 185.513794, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840604446078 0xae82fc00 -582.484253, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840617295155 0xae82d800 155.208984, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840617539318 0xae82fc00 -612.789001, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840633654075 0xae82d800 126.085999, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840633928759 0xae82fc00 -641.911987, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840650470800 0xae82d800 100.705048, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840652424104 0xae82fc00 -667.292969, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840667867412 0xae82d800 79.307190, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840668294697 0xae82fc00 -688.690796, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840684501015 0xae82d800 61.440704, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840684928300 0xae82fc00 -706.557312, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840701226180 0xae82d800 46.738251, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840701714506 0xae82fc00 -721.259766, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840717859783 0xae82d800 34.842224, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840718317589 0xae82fc00 -733.155762, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840734432345 0xae82d800 25.218536, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840734859631 0xae82fc00 -742.779419, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840751401672 0xae82d800 17.543427, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840751828957 0xae82fc00 -750.454529, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840767882673 0xae82d800 11.547882, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840768309958 0xae82fc00 -756.450134, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840784485755 0xae82d800 6.978790, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840784943561 0xae82fc00 -761.019226, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840801271960 0xae82d800 3.687988, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840801699245 0xae82fc00 -764.309998, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840817875042 0xae82d800 1.504700, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840818302328 0xae82fc00 -766.493286, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840843634237 0xae82d800 0.305695, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840844061522 0xae82fc00 -767.692322, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840861915940 0xae82fc00 -767.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840889048551 0xae82fc00 -767.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840908245865 0xae82fc00 -767.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840919355280 0xae82fc00 -767.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840936080445 0xae82fc00 -767.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3840952866649 0xae82fc00 -767.997986, 0.000000
+I/Gecko   (  179): UniformityInfo Layer_Move 3841308276387 0xae82fc00 -767.997986, 0.000000
                 </textarea>
 		<button onclick="loadData()">Reload data</button>
 	</div>
