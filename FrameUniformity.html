@@ -135,13 +135,23 @@ p {
 			var valueX = parseFloat(tokens[j + 3]);
 			var valueY = parseFloat(tokens[j + 4]);
 			
-			if (isNotFirst) {
+                        if (isNotFirst) {
 				if (!(layerID == tokens[j + 2])) {
 					continue;
 				}
-				var emptyNum = (timestamp - preTimeStamp) / 16;
 				
- 				putEmptyData(emptyNum-1);
+                                if ( actualLines == 0) {
+                                        timeDelay = (timestamp - (touchDownTime/1000000)) / 16;
+					if (timeDelay < 1) {
+					  timeDelay = 1;
+				        }
+                                        putEmptyData(timeDelay);
+                                        var result = "First Response Time :  " + (timestamp - (touchDownTime/1000000) ).toFixed(2) + "ms" + "<p>";
+		          document.getElementById('First_Response').innerHTML = result;
+		        } else {
+                               var emptyNum = (timestamp - preTimeStamp) / 16;
+                                        putEmptyData(emptyNum-1);
+                               }
  				
  				putData(Math.abs(preDataX - valueX),
  						Math.abs(preDataY - valueY),
@@ -149,11 +159,11 @@ p {
 			} else {
 				layerID = tokens[j + 2];
 				isNotFirst = true;
-				timeDelay = (timestamp - (touchDownTime/1000000)) / 16;
-				if (timeDelay < 1) {
-					timeDelay = 1;
-				}
-				putEmptyData(timeDelay);
+				// timeDelay = (timestamp - (touchDownTime/1000000)) / 16;
+				// if (timeDelay < 1) {
+				// 	timeDelay = 1;
+				// }
+				//putEmptyData(timeDelay);
 			}
 
 			preDataX = valueX;
@@ -175,7 +185,8 @@ p {
 		{
 			if (aNum < 1) {				
 				return;
-			}				
+			}
+			console.log(" time delay ---= "+ aNum);
 			for ( var tick = 0; tick < aNum; tick++) {
 				putData(0,0,16);
 			}			    
@@ -483,6 +494,7 @@ I/Gecko   (  179): UniformityInfo Layer_Move 3841308276387 0xae82fc00 -767.99798
 	<div id="numbers" style="width: 1000px">
 		<div id="Scroll_X" style="float: left; width: 450px; height: 80px;"></div>
 		<div id="Scroll_Y" style="float: right; width: 450px; height: 80px;"></div>
+		<div id="First_Response" style="float: left; width: 450px; height: 80px;"></div>
 	</div>
 </body>
 </html>
